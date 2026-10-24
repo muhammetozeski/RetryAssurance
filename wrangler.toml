@@ -1,0 +1,8 @@
+name = "muhammetozeski-retry-assurance"
+pages_build_output_dir = "public"
+compatibility_date = "2026-10-24"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "retry-assurance"
+database_id = "0d144a72-cc9d-47a1-ac1f-9d5d55c0647e"

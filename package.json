@@ -1,0 +1,1 @@
+{"name":"retry-assurance-service","private":true,"type":"module","scripts":{"check":"node scripts/check.mjs","verify":"node verification/service.spec.mjs"},"engines":{"node":">=24"}}
