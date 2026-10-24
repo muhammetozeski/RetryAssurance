@@ -11,6 +11,8 @@ public/appearance.css
 public/appearance.js
 public/icon.svg
 public/build-info.json
+public/*.br
+public/*.gz
 .wrangler/
 node_modules/
 .dev.vars
