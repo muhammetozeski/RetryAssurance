@@ -11,9 +11,9 @@
 }
 <p><a href="/account">Create or recover your actual account</a> before using account-linked billing.</p>
 @code{
-BillingState? State;
+BillingState? State;string CheckoutRequestId=Guid.NewGuid().ToString();
 protected override Task OnInitializedAsync()=>Load();
 Task Load()=>Act(async()=>{var value=await Api.GetAsync<BillingState>("billing");if(!Disposed)State=value;});
-Task StartCheckout()=>Act(async()=>{var destination=await Api.PostAsync<BillingDestination>("billing/checkout",new{});if(!Uri.TryCreate(destination.Url,UriKind.Absolute,out var target)||target.Scheme!="https"||target.Host!="checkout.stripe.com")throw new InvalidOperationException("The provider returned an unexpected destination.");Navigation.NavigateTo(destination.Url,true);});
+Task StartCheckout()=>Act(async()=>{var destination=await Api.PostAsync<BillingDestination>("billing/checkout",new{requestId=CheckoutRequestId});if(!Uri.TryCreate(destination.Url,UriKind.Absolute,out var target)||target.Scheme!="https"||target.Host!="checkout.stripe.com")throw new InvalidOperationException("The provider returned an unexpected destination.");Navigation.NavigateTo(destination.Url,true);});
 Task OpenManagement()=>Act(async()=>{var destination=await Api.PostAsync<BillingDestination>("billing/portal",new{});if(!Uri.TryCreate(destination.Url,UriKind.Absolute,out var target)||target.Scheme!="https"||target.Host!="billing.stripe.com")throw new InvalidOperationException("The provider returned an unexpected management destination.");Navigation.NavigateTo(destination.Url,true);});
 }
