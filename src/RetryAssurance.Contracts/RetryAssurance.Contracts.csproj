@@ -1,1 +1,1 @@
-<Project Sdk="Microsoft.NET.Sdk" />
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><Description>Typed versioned execution, evidence and client-observation contracts for Retry Assurance.</Description><RepositoryUrl>https://github.com/muhammetozeski/RetryAssurance</RepositoryUrl><PackageReadmeFile>README.md</PackageReadmeFile></PropertyGroup><ItemGroup><None Include="..\..\README.md" Pack="true" PackagePath="README.md" /></ItemGroup></Project>

@@ -8,7 +8,7 @@ From the repository root:
 
 ```powershell
 dotnet build examples/CorrectClient/CorrectClient.csproj -c Release
-$env:RA_PROJECT_TOKEN = Read-Host 'Project runner capability'
+$env:RA_PROJECT_TOKEN = Read-Host -MaskInput 'Project runner capability'
 dotnet examples/CorrectClient/bin/Release/net10.0/CorrectClient.dll --server https://muhammetozeski-retry-assurance.pages.dev --commit YOUR_ACTUAL_COMMIT
 ```
 

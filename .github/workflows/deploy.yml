@@ -24,6 +24,10 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
+      - name: Verify actual SQL admission and bounded billing adapters
+        run: node verification/service.spec.mjs
+      - name: Verify runner failure paths and transport boundary
+        run: dotnet run --project verification/RunnerChecks/RunnerChecks.csproj -c Release --no-launch-profile
       - name: Publish independent Blazor service portal
         run: ./scripts/Publish-Portal.ps1
       - name: Parse service source

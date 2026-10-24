@@ -6,5 +6,6 @@
 - [Portable runner](Runner.md): actual SDK adaptation, destination/privacy boundaries and executed narrow failure-path checks.
 - [Independent portal](Portal.md): real account/project/run workflow, private key handling and native appearance audit markers.
 - [Operator and release operations](Operations.md): hosting/migrations, actual billing readiness, secret handling and verification scopes.
+- [Version 1.0.0](Release-1.0.0.md): concrete portable package contents, initial service behavior and verification limits.
 
 README.md describes usage. Dated continuation context belongs in ../Walkthrough rather than this index.
