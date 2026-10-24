@@ -154,7 +154,7 @@ internal static class ExceptionBoundary
         {
             try
             {
-                Log(message, isRun: isRun);
+                Log(message, PrintToConsole: false, isRun: isRun);
             }
             catch (Exception loggingException)
             {

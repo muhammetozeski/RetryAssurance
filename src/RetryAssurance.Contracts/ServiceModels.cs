@@ -34,6 +34,8 @@ public sealed record ResourceEvidence(string Id,[property:JsonPropertyName("key_
 public sealed record ExecutionResult(string Verdict,int ResourceCount,int RequestCount,int KeyCount,List<string> Issues,List<string> ServerProven,ReportedResult RunnerReported,string Coverage);
 /// <summary>The server marks a client result as reported and checks its resource reference without attesting arbitrary code.</summary>
 public sealed record ReportedResult(string Terminal,string? ReturnedResourceId,bool ReturnedResourceObserved,bool IndependentlyAttested);
+/// <summary>The client's explicitly submitted note, distinct from observed request effects.</summary>
+public sealed record RunnerObservation(string? ReturnedResourceId,string Detail,string Source);
 /// <summary>A version-pinned server execution with no account or capability hashes exposed.</summary>
 public sealed class ExecutionRecord
 {
@@ -43,6 +45,7 @@ public sealed class ExecutionRecord
     public string Client {get;set;}="";public string PackageVersion {get;set;}="";public string CommitId {get;set;}="";public string? ReplayOf {get;set;}
     public string State {get;set;}="";public long CreatedAt {get;set;}public long ExpiresAt {get;set;}public long? FinishedAt {get;set;}
     public ExecutionResult? Result {get;set;}
+    public RunnerObservation? RunnerObservation {get;set;}
 }
 /// <summary>The same actual evidence response is consumed by the portal and portable runner.</summary>
 public sealed record ExecutionEvidence(ExecutionRecord Run,List<RequestEvidence> Requests,List<ResourceEvidence> Resources);

@@ -3,37 +3,42 @@
 @inject PortalApi Api
 @inject AccountSession Session
 @inject NavigationManager Navigation
-<PageTitle>Account and access — Retry Assurance</PageTitle>
-<span class="eyebrow">ACTUAL SESSION · PRIVATE RECOVERY KEY</span><h1>Account &amp; access</h1><StatusMessage Text="@Message" Error="@Failed" />
-@if(!Session.Loaded){<p>Reading the current server session.</p>}
+<PageTitle>Account — Retry Assurance</PageTitle>
+<h1>Account</h1><StatusMessage Text="@Message" Error="@Failed" />
+@if(!Session.Loaded){<p>Loading account.</p><button disabled="@Busy" @onclick="RefreshAccount">Try again</button>}
+else if(NewRecoveryKey.Length>0)
+{
+<section class="secret-panel"><h2>Save your recovery key</h2><p>Shown once. Anyone with this key can access your account.</p><label>Recovery key<input type="@(ShowRecovery?"text":"password")" readonly value="@NewRecoveryKey" autocomplete="off"></label><div class="actions"><button @onclick="()=>ShowRecovery=!ShowRecovery" disabled="@Busy">@(ShowRecovery?"Hide":"Reveal")</button><button @onclick="()=>Act(()=>Copy(NewRecoveryKey))" disabled="@Busy">Copy</button><button @onclick="DownloadRecovery" disabled="@Busy">Download key</button><button class="primary" @onclick="ContinueAfterSave" disabled="@Busy">I saved it — continue</button></div></section>
+}
 else if(Session.Account is {} account)
 {
-<section class="panel"><h2>@account.Alias</h2><p class="mono">Account @account.Id</p><p>This is a recovery-key account. The alias is self-supplied; it is not a verified identity or email address.</p><div class="actions"><a class="button primary" href="/projects">Open my projects</a><button disabled="@Busy" @onclick="Logout">Sign out this session</button></div></section>
+<section class="panel"><h2>@account.Alias</h2><div class="actions">@if(InviteToken.Length==0){<a class="button primary" href="@ContinuePath">Continue</a>}<button disabled="@Busy" @onclick="Logout">Sign out</button></div><details><summary>Account ID</summary><p class="mono">@account.Id</p></details></section>
 }
 else
 {
-<div class="split-panel"><section><h2>Create a provider account</h2><p>No production API key or email address is requested. A private recovery key is your account credential; save it before leaving this view.</p><label>Account alias<input @bind="Alias" maxlength="80" autocomplete="organization" disabled="@Busy"></label><button class="primary" disabled="@Busy" @onclick="Create">Create actual account</button></section><section><h2>Recover an account</h2><label>Private recovery key<input type="password" @bind="RecoveryInput" maxlength="43" autocomplete="off" disabled="@Busy"></label><button disabled="@Busy" @onclick="Recover">Recover my account</button><p class="quiet">Anyone holding the recovery key can access that account. The service does not invent an email verification or password-reset flow.</p></section></div>
-}
-@if(NewRecoveryKey.Length>0)
-{
-<section class="secret-panel"><h2>Save your recovery key now</h2><p>The service shows this key once. It stays in this view's memory until you clear it or leave; it is not stored in browser local storage.</p><label>Private account recovery key<input type="@(ShowRecovery?"text":"password")" readonly value="@NewRecoveryKey" autocomplete="off"></label><div class="actions"><button @onclick="()=>ShowRecovery=!ShowRecovery" disabled="@Busy">@(ShowRecovery?"Hide":"Reveal")</button><button @onclick="()=>Act(()=>Copy(NewRecoveryKey))" disabled="@Busy">Copy privately</button><button @onclick="DownloadRecovery" disabled="@Busy">Download private recovery file</button><button @onclick="ClearRecovery" disabled="@Busy">I saved it; clear this view</button></div></section>
+<div class="split-panel"><section><h2>Create account</h2><p>No email or card needed. Keep the recovery key to sign in again.</p><label>Your team or name<input @bind="Alias" maxlength="80" autocomplete="organization" disabled="@Busy"></label><button class="primary" disabled="@(Busy||string.IsNullOrWhiteSpace(Alias))" @onclick="Create">Create account</button></section><section><h2>Sign in</h2><label>Recovery key<input type="password" @bind="RecoveryInput" maxlength="43" autocomplete="off" disabled="@Busy"></label><button disabled="@(Busy||RecoveryInput.Length!=43)" @onclick="Recover">Sign in</button></section></div>
 }
 @if(InviteToken.Length>0)
 {
-<section class="panel"><h2>Project invitation</h2><p>An invitation was supplied in this address fragment. It will be sent only to this same-origin account service when you explicitly accept.</p><button class="primary" disabled="@(Busy||Session.Account is null)" @onclick="JoinInvite">Accept with this actual account</button>@if(Session.Account is null){<p>Create or recover your account above first.</p>}</section>
+<section class="panel"><h2>Join a project</h2><p>Accept this invitation with your account.</p><button class="primary" disabled="@(Busy||Session.Account is null||NewRecoveryKey.Length>0)" @onclick="JoinInvite">Accept invitation</button>@if(Session.Account is null){<p>Create or sign in above first.</p>}</section>
 }
-@if(Session.Account is not null)
+@if(Session.Account is not null&&NewRecoveryKey.Length==0)
 {
-<details class="danger"><summary>Delete this account and owned data</summary><p>This deletes owned projects, capabilities and run evidence, removes your memberships and revokes your issued capabilities. Export any evidence you want to keep first. An active live subscription must end before deletion.</p><label>Type DELETE MY ACCOUNT<input @bind="DeleteConfirmation" autocomplete="off" disabled="@Busy"></label><button disabled="@(Busy||DeleteConfirmation!="DELETE MY ACCOUNT")" @onclick="DeleteAccount">Delete my actual account and owned data</button></details>
+<details class="danger"><summary>Delete account and owned data</summary><p>This deletes your owned projects and results, and removes your access to shared projects. Export anything you need first. An active paid period must end before deletion.</p><label>Type DELETE MY ACCOUNT<input @bind="DeleteConfirmation" autocomplete="off" disabled="@Busy"></label><button disabled="@(Busy||DeleteConfirmation!="DELETE MY ACCOUNT")" @onclick="DeleteAccount">Delete account</button></details>
 }
+@if(Session.Loaded&&NewRecoveryKey.Length==0){<button disabled="@Busy" @onclick="RefreshAccount">Refresh account</button>}
 @code{
+[SupplyParameterFromQuery(Name="next")]public string? Next{get;set;}
 string Alias="",RecoveryInput="",NewRecoveryKey="",DeleteConfirmation="",InviteToken="";bool ShowRecovery;
-protected override async Task OnInitializedAsync(){var fragment=Navigation.ToAbsoluteUri(Navigation.Uri).Fragment;if(fragment.StartsWith("#invite=",StringComparison.Ordinal))InviteToken=Uri.UnescapeDataString(fragment[8..]);await Act(async()=>{await Session.RefreshAsync();});}
-Task Create()=>Act(async()=>{var response=await Api.PostAsync<AccountReply>("accounts",new{alias=Alias});if(response.Account is null||string.IsNullOrEmpty(response.RecoveryKey))throw new InvalidOperationException("The account response was incomplete.");Session.Accept(response.Account);NewRecoveryKey=response.RecoveryKey;Done("Actual account created. Save the recovery key before leaving this view.");});
-Task Recover()=>Act(async()=>{var response=await Api.PostAsync<AccountReply>("sessions",new{recoveryKey=RecoveryInput});Session.Accept(response.Account);RecoveryInput="";Done("The actual account session was recovered.");});
-Task Logout()=>Act(async()=>{await Api.PostAsync<Acknowledgement>("sessions/logout",new{});Session.Accept(null);ClearRecovery();Done("This session was signed out. Your server-owned projects remain in the account.");});
-Task DownloadRecovery()=>Act(async()=>{await Download("retry-assurance-private-recovery.txt","Retry Assurance private recovery credential\nService: "+new Uri(Navigation.BaseUri).GetLeftPart(UriPartial.Authority)+"\nAccount: "+Session.Account?.Id+"\nRecovery key: "+NewRecoveryKey+"\nAnyone holding this file can access the account. Store privately.","text/plain;charset=utf-8");Done("Private recovery file downloaded. Keep it out of repositories and public folders.");});
+string ContinuePath{get{if(Next is "/projects" or "/projects/new" or "/runner" or "/account/billing")return Next;foreach(var prefix in new[]{"/projects/","/runs/"})if(Next?.StartsWith(prefix,StringComparison.Ordinal)==true&&Guid.TryParseExact(Next[prefix.Length..],"D",out _))return Next;return "/projects";}}
+protected override async Task OnInitializedAsync(){var fragment=Navigation.ToAbsoluteUri(Navigation.Uri).Fragment;if(fragment.StartsWith("#invite=",StringComparison.Ordinal))InviteToken=Uri.UnescapeDataString(fragment[8..]);await RefreshAccount();}
+Task RefreshAccount()=>Act(async()=>await Session.RefreshAsync());
+Task Create()=>Act(async()=>{var response=await Api.PostAsync<AccountReply>("accounts",new{alias=Alias});if(response.Account is null||string.IsNullOrEmpty(response.RecoveryKey))throw new InvalidOperationException("The account response was incomplete.");Session.Accept(response.Account);NewRecoveryKey=response.RecoveryKey;Done("");});
+Task Recover()=>Act(async()=>{var response=await Api.PostAsync<AccountReply>("sessions",new{recoveryKey=RecoveryInput});Session.Accept(response.Account);RecoveryInput="";Done("");});
+Task Logout()=>Act(async()=>{await Api.PostAsync<Acknowledgement>("sessions/logout",new{});Session.Accept(null);ClearRecovery();Done("Signed out.");});
+Task DownloadRecovery()=>Act(async()=>{await Download("retry-assurance-private-recovery.txt","Retry Assurance private recovery credential\nService: "+new Uri(Navigation.BaseUri).GetLeftPart(UriPartial.Authority)+"\nAccount: "+Session.Account?.Id+"\nRecovery key: "+NewRecoveryKey+"\nAnyone holding this file can access the account. Store privately.","text/plain;charset=utf-8");Done("Recovery file downloaded. Keep it private.");});
 void ClearRecovery(){NewRecoveryKey="";ShowRecovery=false;}
+void ContinueAfterSave(){ClearRecovery();if(InviteToken.Length==0)Navigation.NavigateTo(ContinuePath);}
 Task JoinInvite()=>Act(async()=>{var response=await Api.PostAsync<JoinedInvitation>("invites/join",new{token=InviteToken});InviteToken="";Navigation.NavigateTo("/projects/"+response.ProjectId,replace:true);});
-Task DeleteAccount()=>Act(async()=>{await Api.PostAsync<Acknowledgement>("account/delete",new{confirmation=DeleteConfirmation});Session.Accept(null);DeleteConfirmation="";ClearRecovery();Done("The account and its owned data were deleted by the actual service.");});
+Task DeleteAccount()=>Act(async()=>{await Api.PostAsync<Acknowledgement>("account/delete",new{confirmation=DeleteConfirmation});Session.Accept(null);DeleteConfirmation="";ClearRecovery();Done("Account and owned data deleted.");});
 }

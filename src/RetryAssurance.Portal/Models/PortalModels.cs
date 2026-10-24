@@ -15,7 +15,7 @@ public sealed record ProjectIdentity(string Id,string Name,string Role,int Contr
 /// <summary>An immutable behavior contract and scenario content identity.</summary>
 public sealed record ContractRevision(int Revision,RetryAssurance.Contracts.BehaviorContract Document,string DocumentHash,string PackVersion,string PackHash,long CreatedAt);
 /// <summary>A capability list never contains bearer values or hashes.</summary>
-public sealed record CapabilitySummary(string Id,string Label,long CreatedAt,long ExpiresAt,long? RevokedAt);
+public sealed record CapabilitySummary(string Id,string Label,long CreatedAt,long ExpiresAt,long? RevokedAt,bool CanRevoke=false);
 /// <summary>The project detail combines real role, immutable contracts and revocable capability metadata.</summary>
 public sealed record ProjectDetail(ProjectIdentity Project,List<ContractRevision> Contracts,List<CapabilitySummary> Capabilities);
 /// <summary>A newly created capability is shown once for intentional private copying.</summary>

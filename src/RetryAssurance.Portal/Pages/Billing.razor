@@ -1,19 +1,29 @@
 @page "/account/billing"
 @inherits ActionPage
 @inject PortalApi Api
+@inject AccountSession Session
 @inject NavigationManager Navigation
-<PageTitle>Subscription — Retry Assurance</PageTitle><span class="eyebrow">REAL PROVIDER NOTIFICATIONS ONLY</span><h1>Subscription</h1><StatusMessage Text="@Message" Error="@Failed" />
+<PageTitle>Subscription — Retry Assurance</PageTitle><h1>Subscription</h1><StatusMessage Text="@Message" Error="@Failed" />
 @if(State is {} state)
 {
-<div class="plan-grid"><section class="panel"><span class="eyebrow">USABLE WITHOUT PAYMENT</span><h2>Free</h2><p class="price">$0</p><ul><li>Two owned projects</li><li>Fifty executions per UTC calendar month</li><li>Actual maintained-pack execution and allowlisted evidence</li><li>Portable C# runner, real examples and pinned-run comparison</li><li>Owner, editor and viewer project access</li></ul><a class="button primary" href="/projects/new">Use the actual free service</a></section><section class="panel"><span class="eyebrow">OPTIONAL ACCOUNT ALLOWANCE</span><h2>@state.Plan.Name</h2><p class="price">$@((state.Plan.AmountCents/100m).ToString("0.00"))<small> / month</small></p><ul><li>Twenty owned projects</li><li>One thousand executions per UTC calendar month</li><li>The same bounded scenario semantics and source/data portability</li><li>Actual account-linked subscription management</li></ul>@if(!state.Configured){<p class="notice"><strong>Checkout is unavailable.</strong> The operator has not enabled the complete real billing configuration. No simulated payment or paid entitlement is substituted.</p>}else if(state.Premium){<p class="notice"><strong>Live paid allowance active.</strong> This state came from the service's verified live provider record.</p><button disabled="@Busy" @onclick="OpenManagement">Manage the real subscription</button>}else{<p>Provider mode: <strong>@state.Mode</strong>. Returning from checkout alone does not enable paid allowances.</p><button class="primary" disabled="@Busy" @onclick="StartCheckout">Open actual @state.Mode provider checkout</button>}</section></div>
-<section class="scope-callout"><h2>Actual entitlement state</h2><p>Current live paid allowance: <strong>@state.Premium</strong>. Current limits: @state.Plan.ProjectLimit projects and @state.Plan.MonthlyRunLimit monthly executions.</p><p>@state.PriceStatus A proposed subscription's attractiveness is a demand hypothesis, not a claim of customers or revenue.</p><p>The service accepts only a correctly signed provider notification for its configured plan and account. Test-mode notifications cannot grant a live paid allowance. Cancellation and payment details are handled through the real provider portal.</p><button disabled="@Busy" @onclick="Load">Refresh actual billing state</button></section>
-@if(state.Subscriptions.Count>0){<section class="panel"><h2>Linked provider records</h2><ul class="record-list">@foreach(var item in state.Subscriptions){<li><div><strong>@item.Status · @(item.IsLive==1?"Live":"Test; no live paid allowance")</strong><p class="mono">@item.Id</p><p>Provider period end: @Time(item.ExpiresAt)</p></div></li>}</ul><button disabled="@Busy" @onclick="OpenManagement">Open linked provider management</button></section>}
+<p>Your allowance: @state.Plan.ProjectLimit owned projects and @state.Plan.MonthlyRunLimit checks per UTC calendar month.</p>
+<div class="plan-grid"><section class="panel"><h2>Free</h2><p class="price">$0</p><ul><li>Two owned projects</li><li>Fifty checks per month</li><li>Run, inspect, export and compare results</li><li>Owner, editor and viewer access</li></ul><a class="button primary" href="/projects/new">Set up a check</a></section><section class="panel"><h2>@state.Plan.Name</h2>
+@if(state.Premium){<p class="notice">Team access is active.</p>}
+@if(state.Configured){<p class="price">$@((state.Plan.AmountCents/100m).ToString("0.00"))<small> / month</small></p><ul><li>Twenty owned projects</li><li>One thousand checks per month</li></ul>}
+@if(!state.Configured){<p class="notice">Subscriptions are unavailable. Free checks remain available.</p>}
+else if(Session.Account is null){<a class="button" href="/account?next=%2Faccount%2Fbilling">Sign in</a>}
+else if(state.Premium){<button disabled="@Busy" @onclick="OpenManagement">Manage or cancel</button>}
+else{ @if(state.Mode=="test"){<p>Test checkout does not activate Team access.</p>}<button class="primary" disabled="@Busy" @onclick="StartCheckout">@(state.Mode=="test"?"Open test checkout":"Continue to checkout")</button>}
+</section></div>
+@if(state.Subscriptions.Count>0){<details class="panel"><summary>Subscription history</summary><ul class="record-list">@foreach(var item in state.Subscriptions){<li><div><strong>@item.Status @(item.IsLive==1?"":"· test record")</strong>@if(item.ExpiresAt>0){<p>Period ends @Time(item.ExpiresAt)</p>}<p class="mono">@item.Id</p></div></li>}</ul>@if(state.Configured&&Session.Account is not null){<button disabled="@Busy" @onclick="OpenManagement">Manage subscription</button>}</details>}
+<details><summary>After checkout</summary><p>Refresh this page to check access. Cancelling renewal keeps access through the paid period. Manage payment and cancellation with the provider.</p></details>
 }
-<p><a href="/account">Create or recover your actual account</a> before using account-linked billing.</p>
+else if(Busy){<p>Loading subscription.</p>}
+<button disabled="@Busy" @onclick="Load">Refresh status</button>
 @code{
 BillingState? State;string CheckoutRequestId=Guid.NewGuid().ToString();
 protected override Task OnInitializedAsync()=>Load();
-Task Load()=>Act(async()=>{var value=await Api.GetAsync<BillingState>("billing");if(!Disposed)State=value;});
+Task Load()=>Act(async()=>{if(!Session.Loaded)await Session.RefreshAsync();var value=await Api.GetAsync<BillingState>("billing");if(!Disposed)State=value;});
 Task StartCheckout()=>Act(async()=>{var destination=await Api.PostAsync<BillingDestination>("billing/checkout",new{requestId=CheckoutRequestId});if(!Uri.TryCreate(destination.Url,UriKind.Absolute,out var target)||target.Scheme!="https"||target.Host!="checkout.stripe.com")throw new InvalidOperationException("The provider returned an unexpected destination.");Navigation.NavigateTo(destination.Url,true);});
 Task OpenManagement()=>Act(async()=>{var destination=await Api.PostAsync<BillingDestination>("billing/portal",new{});if(!Uri.TryCreate(destination.Url,UriKind.Absolute,out var target)||target.Scheme!="https"||target.Host!="billing.stripe.com")throw new InvalidOperationException("The provider returned an unexpected management destination.");Navigation.NavigateTo(destination.Url,true);});
 }

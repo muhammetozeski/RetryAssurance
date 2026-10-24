@@ -111,7 +111,7 @@
     if(!scheduled){scheduled=true;requestAnimationFrame(flush);}
   }
   const observer=new MutationObserver(mutations=>{for(const mutation of mutations){if(mutation.type==='childList'){for(const node of mutation.addedNodes)queue(node);if(mutation.removedNodes.length)queue(mutation.target);}else queue(mutation.target);}});
-  function observe(){observer.observe(document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','style','hidden','open','data-ra-theme']});}
+  function observe(){observer.observe(document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','style','hidden','open','disabled','data-ra-theme']});}
   function flush() {
     scheduled=false;if(processing)return;processing=true;observer.disconnect();
     try{
