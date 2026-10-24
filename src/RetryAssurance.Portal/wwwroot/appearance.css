@@ -1,0 +1,8 @@
+html[data-ra-theme="dark"]{color-scheme:dark;background-color:#101010;color:#f5f5f5}
+html[data-ra-theme="dark"] body{background-color:#101010;color:#f5f5f5}
+html[data-ra-theme="light"]{color-scheme:light;background-color:#fff;color:#111}
+html[data-ra-theme="light"] body{background-color:#fff;color:#111}
+html[data-ra-theme] input::placeholder,html[data-ra-theme] textarea::placeholder{color:var(--ra-placeholder-color,#999);opacity:1}
+[data-ra-appearance-controls]{display:inline-flex;gap:.5em;margin:.4em 0 .4em .7em}
+[data-ra-appearance-controls] button{font:inherit;padding:.25em .55em;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer}
+

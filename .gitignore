@@ -4,6 +4,13 @@ publish/
 public/_framework/
 public/*.wasm
 public/*.dll
+public/index.html
+public/portal.css
+public/portal.js
+public/appearance.css
+public/appearance.js
+public/icon.svg
+public/build-info.json
 .wrangler/
 node_modules/
 .dev.vars

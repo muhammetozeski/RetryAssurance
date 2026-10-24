@@ -1,0 +1,12 @@
+using System.Globalization;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using RetryAssurance.Portal;
+using RetryAssurance.Portal.Services;
+CultureInfo.DefaultThreadCurrentCulture=CultureInfo.GetCultureInfo("en-US");
+CultureInfo.DefaultThreadCurrentUICulture=CultureInfo.GetCultureInfo("en-US");
+var builder=WebAssemblyHostBuilder.CreateDefault(args);
+builder.RootComponents.Add<App>("#app");builder.RootComponents.Add<HeadOutlet>("head::after");
+builder.Services.AddScoped(_=>new HttpClient{BaseAddress=new Uri(builder.HostEnvironment.BaseAddress)});
+builder.Services.AddScoped<PortalApi>();builder.Services.AddScoped<AccountSession>();
+await builder.Build().RunAsync();

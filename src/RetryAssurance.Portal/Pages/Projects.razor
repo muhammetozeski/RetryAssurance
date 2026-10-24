@@ -1,0 +1,11 @@
+@page "/projects"
+@inherits ActionPage
+@inject PortalApi Api
+<PageTitle>Projects — Retry Assurance</PageTitle><div class="title-row"><div><span class="eyebrow">YOUR REAL EXECUTION WORKSPACES</span><h1>Projects</h1></div><a class="button primary" href="/projects/new">New project</a></div><StatusMessage Text="@Message" Error="@Failed" /><button disabled="@Busy" @onclick="Load">Refresh actual projects</button>
+@if(Loaded&&Items.Count==0){<section class="empty-state"><h2>No projects returned for this account.</h2><p>Create the behavior contract your real client will be checked against. No sample organization or run is inserted for you.</p><a href="/projects/new">Create the first actual project →</a></section>}
+<div class="project-list">@foreach(var item in Items){<a class="project-link" href="@("/projects/"+item.Id)"><div><span class="eyebrow">@item.Role · CONTRACT REVISION @item.ContractRevision</span><h2>@item.Name</h2><p class="mono">@item.Id</p></div><span>Open workflow →</span></a>}</div><p class="quiet">Free accounts can own two projects and create fifty executions per UTC calendar month. A project role controls who can read evidence, operate runners or change the behavior contract.</p><a href="/account">Create or recover an actual account</a>
+@code{
+List<ProjectSummary> Items=[];bool Loaded;
+protected override Task OnInitializedAsync()=>Load();
+Task Load()=>Act(async()=>{var result=await Api.GetAsync<ProjectList>("projects");if(Disposed)return;Items=result.Projects;Loaded=true;Done($"Read {Items.Count} actual member-visible project(s).");});
+}
