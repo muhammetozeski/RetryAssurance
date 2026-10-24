@@ -7,11 +7,11 @@
 @if(State is {} state)
 {
 <p>Your allowance: @state.Plan.ProjectLimit owned projects and @state.Plan.MonthlyRunLimit checks per UTC calendar month.</p>
-<div class="plan-grid"><section class="panel"><h2>Free</h2><p class="price">$0</p><ul><li>Two owned projects</li><li>Fifty checks per month</li><li>Run, inspect, export and compare results</li><li>Owner, editor and viewer access</li></ul><a class="button primary" href="/projects/new">Set up a check</a></section><section class="panel"><h2>@state.Plan.Name</h2>
+<div class="plan-grid"><section class="panel"><h2>Free</h2><p class="price">$0</p><ul><li>Two owned projects</li><li>Fifty checks per month</li><li>Run, inspect, export and compare results</li><li>Owner, editor and viewer access</li></ul><a class="button primary" href="projects/new">Set up a check</a></section><section class="panel"><h2>@state.Plan.Name</h2>
 @if(state.Premium){<p class="notice">Team access is active.</p>}
 @if(state.Configured){<p class="price">$@((state.Plan.AmountCents/100m).ToString("0.00"))<small> / month</small></p><ul><li>Twenty owned projects</li><li>One thousand checks per month</li></ul>}
 @if(!state.Configured){<p class="notice">Subscriptions are unavailable. Free checks remain available.</p>}
-else if(Session.Account is null){<a class="button" href="/account?next=%2Faccount%2Fbilling">Sign in</a>}
+else if(Session.Account is null){<a class="button" href="account?next=%2Faccount%2Fbilling">Sign in</a>}
 else if(state.Premium){<button disabled="@Busy" @onclick="OpenManagement">Manage or cancel</button>}
 else{ @if(state.Mode=="test"){<p>Test checkout does not activate Team access.</p>}<button class="primary" disabled="@Busy" @onclick="StartCheckout">@(state.Mode=="test"?"Open test checkout":"Continue to checkout")</button>}
 </section></div>

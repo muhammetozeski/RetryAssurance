@@ -25,3 +25,5 @@ node_modules/
 *.key
 Imzalama.pfx
 PFX-PAROLA.txt
+
+public/downloads/

@@ -28,13 +28,43 @@ var grant=RefusingObserver.Grant();using(var transport=new ScenarioTransport(gra
     bool blocked=false;try{using var forbidden=await http.PostAsJsonAsync("https://production.invalid/jobs",new{input="synthetic"});}catch(InvalidOperationException){blocked=true;}
     Check(blocked&&capture.Calls==1,"wrong-origin request is refused before inner HTTP transport dispatch");
 }
+
+{
+    const string serviceBase="https://scenario.invalid/retry-assurance/";
+    var control=new RefusingObserver(HttpStatusCode.ServiceUnavailable,false,serviceBase);
+    using var runner=new RetryAssuranceClient(new(new Uri(serviceBase),"Mounted path fixture","1.0.1","mount-consumer"));
+    var field=typeof(RetryAssuranceClient).GetField("control",BindingFlags.Instance|BindingFlags.NonPublic)!;((HttpClient)field.GetValue(runner)!).Dispose();field.SetValue(runner,new HttpClient(control){BaseAddress=new Uri(serviceBase)});
+    var result=await runner.RunAsync(new string('p',43),async(_,_)=>{await control.Observed.Task;return new("indeterminate");});
+    Check(control.CloseCalls==1&&control.Targets.Count>=3&&control.Targets.All(path=>path.StartsWith("/retry-assurance/api/",StringComparison.Ordinal)),"mounted runner control requests retain the full service prefix");
+    Check(result.Evidence.Run.Result?.Verdict=="incomplete","mounted control fixture still distinguishes missing remote effects");
+}
+{
+    const string serviceBase="https://scenario.invalid/retry-assurance/";
+    var control=new RefusingObserver(HttpStatusCode.ServiceUnavailable,false,serviceBase){GrantBaseOverride="https://scenario.invalid/"};
+    using var runner=new RetryAssuranceClient(new(new Uri(serviceBase),"Wrong mount fixture","1.0.1","mount-consumer"));var field=typeof(RetryAssuranceClient).GetField("control",BindingFlags.Instance|BindingFlags.NonPublic)!;((HttpClient)field.GetValue(runner)!).Dispose();field.SetValue(runner,new HttpClient(control){BaseAddress=new Uri(serviceBase)});
+    bool refused=false;int callbacks=0;try{await runner.RunAsync(new string('p',43),(_,_)=>{callbacks++;return Task.FromResult(new ClientObservation("indeterminate"));});}catch(InvalidOperationException){refused=true;}
+    Check(refused&&callbacks==0&&control.CloseCalls==0,"a root-path grant is refused before a mounted client callback");
+}
+{
+    var mountedGrant=RefusingObserver.Grant("https://scenario.invalid/retry-assurance/");using var transport=new ScenarioTransport(mountedGrant,Stopwatch.StartNew(),CancellationToken.None);var original=transport.InnerHandler;var capture=new CapturingHandler();transport.InnerHandler=capture;original!.Dispose();using var http=new HttpClient(transport){BaseAddress=new Uri(mountedGrant.ScenarioBaseUrl)};
+    http.DefaultRequestHeaders.Add("Idempotency-Key","mounted-synthetic-operation");using var accepted=await http.PostAsJsonAsync("jobs",new{input="synthetic mounted boundary"});
+    Check(capture.Calls==1,"issued prefixed synthetic jobs reach the supplied transport");
+    bool refused=false;try{using var invalid=await http.PostAsJsonAsync("https://scenario.invalid/api/simulate/"+mountedGrant.RunId+"/jobs",new{input="synthetic wrong mount"});}catch(InvalidOperationException){refused=true;}
+    Check(refused&&capture.Calls==1,"same-origin jobs outside the issued mount are refused before dispatch");
+}
+{
+    bool refused=false;try{new RunnerOptions(new Uri("https://scenario.invalid/another-app/"),"Unsupported mount","1.0.1","mount-consumer").Validate();}catch(ArgumentException){refused=true;}
+    Check(refused,"unsupported service prefixes cannot receive runner credentials");
+}
+
 Console.WriteLine($"{checks} targeted runner/control/transport assertions passed. These isolated control replies do not claim service integration or real remote effects.");
 
-sealed class RefusingObserver(HttpStatusCode observerStatus,bool closeRefused):HttpMessageHandler
+sealed class RefusingObserver(HttpStatusCode observerStatus,bool closeRefused,string serviceBase="https://scenario.invalid/"):HttpMessageHandler
 {
+    public string? GrantBaseOverride;public List<string> Targets=[];
     public readonly TaskCompletionSource Observed=new(TaskCreationOptions.RunContinuationsAsynchronously);public int CloseCalls;
-    public static ExecutionGrant Grant(){var id="00000000-0000-4000-a000-000000000001";return new(id,new string('k',43),"00000000-0000-4000-a000-000000000002","https://scenario.invalid/api/simulate/"+id+"/",new("ra-core","1.0.0","Controlled fixture","commit-then-delay",3000,6,"No real effects in this failure-path fixture.",new("POST","jobs"),1,new string('a',64)),1,new string('b',64),new("Fixture","Idempotency-Key","client",["indeterminate"]),DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeMilliseconds());}
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken cancellationToken){if(request.RequestUri!.AbsolutePath=="/api/runner/runs")return Reply(HttpStatusCode.Created,Grant());if(request.Method==HttpMethod.Get){Observed.TrySetResult();return Reply(observerStatus,new ServiceFailure("Controlled optional observer refusal","fixture"));}CloseCalls++;if(closeRefused)return Reply(HttpStatusCode.NotFound,new ServiceFailure("Controlled revoked run","run_auth"));var run=new ExecutionRecord{Id=Grant().RunId,State="finalized",Result=new("incomplete",0,0,0,["No real effects in this isolated fixture."],[],new("indeterminate",null,false,false),"Failure-path unit check only.")};return Reply(HttpStatusCode.OK,new ExecutionEvidence(run,[],[]));}
+    public static ExecutionGrant Grant(string serviceBase="https://scenario.invalid/"){var id="00000000-0000-4000-a000-000000000001";return new(id,new string('k',43),"00000000-0000-4000-a000-000000000002",new Uri(new Uri(serviceBase),"api/simulate/"+id+"/").AbsoluteUri,new("ra-core","1.0.0","Controlled fixture","commit-then-delay",3000,6,"No real effects in this failure-path fixture.",new("POST","jobs"),1,new string('a',64)),1,new string('b',64),new("Fixture","Idempotency-Key","client",["indeterminate"]),DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeMilliseconds());}
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken cancellationToken){Targets.Add(request.RequestUri!.AbsolutePath);if(request.RequestUri.AbsolutePath==new Uri(new Uri(serviceBase),"api/runner/runs").AbsolutePath)return Reply(HttpStatusCode.Created,Grant(GrantBaseOverride??serviceBase));if(request.Method==HttpMethod.Get){Observed.TrySetResult();return Reply(observerStatus,new ServiceFailure("Controlled optional observer refusal","fixture"));}CloseCalls++;if(closeRefused)return Reply(HttpStatusCode.NotFound,new ServiceFailure("Controlled revoked run","run_auth"));var run=new ExecutionRecord{Id=Grant().RunId,State="finalized",Result=new("incomplete",0,0,0,["No real effects in this isolated fixture."],[],new("indeterminate",null,false,false),"Failure-path unit check only.")};return Reply(HttpStatusCode.OK,new ExecutionEvidence(run,[],[]));}
     static Task<HttpResponseMessage> Reply(HttpStatusCode status,object body)=>Task.FromResult(new HttpResponseMessage(status){Content=JsonContent.Create(body)});
 }
 sealed class CapturingHandler:HttpMessageHandler

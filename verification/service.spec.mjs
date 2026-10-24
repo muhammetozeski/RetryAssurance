@@ -2,6 +2,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {onRequest} from '../functions/api/[[path]].js';
+import {handleRequest} from '../server/handler.mjs';
 
 /** D1-shaped consumer of actual SQLite and production SQL; it does not replace production rules or responses. */
 class SqliteD1 {
@@ -76,5 +77,39 @@ await restoreEditor();
 const staleCapability=pausedPost('projects/'+projectId+'/capabilities',{label:'Stale role must not create this'},{Cookie:other.cookie});await staleCapability.reading;await call('projects/'+projectId+'/members/'+other.body.account.id,{role:'remove'},{cookie:owner.cookie});staleCapability.release();check([403,404].includes((await staleCapability.response).status),'paused capability creation cannot outlive editor membership');check(db.native.prepare('SELECT COUNT(*) AS n FROM ra_capabilities WHERE created_by=? AND revoked_at IS NULL').get(other.body.account.id).n===0,'stale capability admission leaves no active token row');
 await restoreEditor();const editorCap=await call('projects/'+projectId+'/capabilities',{label:'Editor mint-race fixture'},{cookie:other.cookie});const staleMintId=crypto.randomUUID(),staleMint=pausedPost('runner/runs',{...mintBody,requestId:staleMintId},{Authorization:'Bearer '+editorCap.body.token});await staleMint.reading;await call('projects/'+projectId+'/members/'+other.body.account.id,{role:'remove'},{cookie:owner.cookie});staleMint.release();check([401,409].includes((await staleMint.response).status),'paused run mint cannot outlive creator membership');check(db.native.prepare('SELECT COUNT(*) AS n FROM ra_runs WHERE mint_request_id=?').get(staleMintId).n===0,'removed editor mint creates no child run');
 await restoreEditor();const effectCap=await call('projects/'+projectId+'/capabilities',{label:'Editor effect-race fixture'},{cookie:other.cookie}),effectRun=await call('runner/runs',{...mintBody,requestId:crypto.randomUUID()},{token:effectCap.body.token});const staleEffect=pausedPost('simulate/'+effectRun.body.runId+'/jobs',{input:'explicitly synthetic paused effect'},{'X-RA-Run-Key':effectRun.body.runKey,...headersFor(effectRun.body,'key-before-downgrade')});await staleEffect.reading;await call('projects/'+projectId+'/members/'+other.body.account.id,{role:'viewer'},{cookie:owner.cookie});staleEffect.release();check((await staleEffect.response).status===409,'paused scenario effect cannot commit after editor downgrade');check(db.native.prepare('SELECT COUNT(*) AS n FROM ra_resources WHERE run_id=?').get(effectRun.body.runId).n===0,'downgrade race leaves zero durable effects');check((await call('runner/runs/'+effectRun.body.runId+'/evidence',null,{runKey:effectRun.body.runKey})).status===404,'creator role loss also denies existing child evidence');
-await Promise.all(pending);check(firstFinished,'deliberate first acknowledgement completes after durable commit');
+// Mount requests use the same SQLite records with a different salt; no live account or provider is involved.
+const mountedOrigin='https://mounted-retry.example',mountedBase='/retry-assurance',mountedEnv={DB:db,RATE_SALT:'different-isolated-mount-salt'};
+async function mounted(path,body=null,{cookie=null,token=null,runKey=null,headers={},originHeader=mountedOrigin,environment=mountedEnv}={}){
+ const all={'CF-Connecting-IP':'192.0.2.42',...headers};if(body!==null)all['Content-Type']='application/json';if(originHeader)all.Origin=originHeader;if(cookie)all.Cookie=cookie;if(token)all.Authorization='Bearer '+token;if(runKey)all['X-RA-Run-Key']=runKey;
+ const response=await handleRequest({request:new Request(mountedOrigin+mountedBase+'/api/'+path,{method:body===null?'GET':'POST',headers:all,body:body===null?undefined:JSON.stringify(body)}),env:environment},{basePath:mountedBase});const setCookie=response.headers.get('set-cookie');return {status:response.status,body:await response.json(),setCookie,cookie:setCookie?.split(';')[0]};
+}
+check((await mounted('health')).body.ok===true,'mounted handler serves its prefixed health route');
+check((await handleRequest({request:new Request(mountedOrigin+'/api/health'),env:mountedEnv},{basePath:mountedBase})).status===404,'mounted handler refuses an unprefixed API alias');
+check((await mounted('accounts',{alias:'Not created'},{originHeader:'https://foreign.example'})).status===403,'mounted account writes retain actual-origin checks');
+const mountedOwner=await mounted('sessions',{recoveryKey:owner.body.recoveryKey});
+check(mountedOwner.body.account.id===owner.body.account.id&&mountedOwner.setCookie.includes('Path=/retry-assurance/api;')&&mountedOwner.setCookie.includes('HttpOnly; Secure; SameSite=Strict'),'existing recovery key works with new salt and a scoped mounted cookie');
+const mountedCap=await mounted('projects/'+projectId+'/capabilities',{label:'Mounted request fixture'},{cookie:mountedOwner.cookie});
+const legacyMintInput={...mintBody,requestId:crypto.randomUUID()},legacyMint=await call('runner/runs',legacyMintInput,{token:mountedCap.body.token});
+check(legacyMint.status===201&&legacyMint.body.scenarioBaseUrl.startsWith(origin+'/api/simulate/'),'independent-origin scenario URLs stay unchanged');
+const crossedMint=await mounted('runner/runs',legacyMintInput,{token:mountedCap.body.token});
+check(crossedMint.status===409&&crossedMint.body.code==='mint_endpoint','cross-salt mint replay refuses a mismatched derived key');
+check((await call('runner/runs',legacyMintInput,{token:mountedCap.body.token})).body.runKey===legacyMint.body.runKey,'original-endpoint mint replay still returns the original working key');
+check((await mounted('runner/runs/'+legacyMint.body.runId+'/evidence',null,{runKey:legacyMint.body.runKey})).status===200,'previously issued child key remains valid through the mounted endpoint');
+const mountedMintInput={...mintBody,requestId:crypto.randomUUID()},mountedRun=await mounted('runner/runs',mountedMintInput,{token:mountedCap.body.token});
+check(mountedRun.status===201&&mountedRun.body.scenarioBaseUrl===mountedOrigin+mountedBase+'/api/simulate/'+mountedRun.body.runId+'/','mounted grant contains the exact prefixed scenario URL');
+check((await mounted('runner/runs',mountedMintInput,{token:mountedCap.body.token})).body.runKey===mountedRun.body.runKey,'mounted mint replay preserves its run and key');
+let mountedFirstFinished=false;const mountedFirst=mounted('simulate/'+mountedRun.body.runId+'/jobs',{input:'synthetic mount check'},{runKey:mountedRun.body.runKey,headers:headersFor(mountedRun.body,'stable-mount-key')}).then(value=>{mountedFirstFinished=true;return value;});pending.push(mountedFirst);
+const mountedDuring=await observed(mountedRun.body);
+check(!mountedFirstFinished&&mountedDuring.resources.length===1,'mounted scenario commits to the existing database before delayed acknowledgement');
+const mountedRepeat=await mounted('simulate/'+mountedRun.body.runId+'/jobs',{input:'synthetic mount check'},{runKey:mountedRun.body.runKey,headers:headersFor(mountedRun.body,'stable-mount-key')});
+const mountedClose=await mounted('runner/runs/'+mountedRun.body.runId+'/close',{terminal:'success',returnedResourceId:mountedRepeat.body.id,observation:'Synthetic mounted-route fixture'},{runKey:mountedRun.body.runKey});
+check(mountedClose.body.run.result.verdict==='pass'&&mountedClose.body.resources.length===1,'mounted retry and close preserve the single-resource verdict');
+await call('projects/'+projectId+'/capabilities/'+mountedCap.body.id,{}, {cookie:owner.cookie});
+check((await mounted('runner/runs/'+mountedRun.body.runId+'/evidence',null,{runKey:mountedRun.body.runKey})).status===404,'legacy-host revocation also denies mounted child access');
+check((await mounted('runs/'+mountedRun.body.runId,null,{cookie:mountedOwner.cookie})).status===200,'account-authorized history survives cross-host capability revocation');
+check((await mounted('billing',null,{cookie:mountedOwner.cookie})).body.configured===false,'mounted billing stays unavailable without its own provider configuration');
+check((await mounted('billing/webhook',{id:'synthetic-unsigned-event'},{originHeader:'https://provider.example',environment:{...mountedEnv,STRIPE_WEBHOOK_SECRET:'isolated-signature-fixture'}})).status===400,'mounted webhook keeps signature verification instead of accepting a foreign-origin write');
+const mountedLogout=await mounted('sessions/logout',{}, {cookie:mountedOwner.cookie});
+check(mountedLogout.setCookie.includes('Path=/retry-assurance/api;')&&mountedLogout.setCookie.includes('Max-Age=0;')&&(await call('account',null,{cookie:owner.cookie})).body.account.id===owner.body.account.id,'mounted logout clears its scoped cookie without removing the original host session');
+await Promise.all(pending);check(firstFinished&&mountedFirstFinished,'deliberate first acknowledgements complete after durable commits');
 console.log(`${checks} actual-SQL service assertions passed.`);

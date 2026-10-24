@@ -41,7 +41,7 @@ public sealed class RetryAssuranceClient : IDisposable
         }
     }
     /// <summary>Verifies a server grant's declared path before giving it to a customer adapter.</summary>
-    void ValidateGrant(ExecutionGrant grant){var target=new Uri(grant.ScenarioBaseUrl);if(target.Scheme!=options.ServiceOrigin.Scheme||target.IdnHost!=options.ServiceOrigin.IdnHost||target.Port!=options.ServiceOrigin.Port||target.AbsolutePath!="/api/simulate/"+grant.RunId+"/"||target.Query.Length!=0||target.UserInfo.Length!=0||grant.RunKey.Length!=43||grant.Pack.Scenario!="commit-then-delay"||grant.Pack.Operation.Method!="POST"||grant.Pack.Operation.Path!="jobs")throw new InvalidOperationException("The service grant does not match the expected fixed-origin synthetic scenario contract.");}
+    void ValidateGrant(ExecutionGrant grant){var target=new Uri(grant.ScenarioBaseUrl);if(target.Scheme!=options.ServiceOrigin.Scheme||target.IdnHost!=options.ServiceOrigin.IdnHost||target.Port!=options.ServiceOrigin.Port||target.AbsolutePath!=new Uri(options.ServiceOrigin,"api/simulate/"+grant.RunId+"/").AbsolutePath||target.Query.Length!=0||target.UserInfo.Length!=0||grant.RunKey.Length!=43||grant.Pack.Scenario!="commit-then-delay"||grant.Pack.Operation.Method!="POST"||grant.Pack.Operation.Path!="jobs")throw new InvalidOperationException("The service grant does not match the expected fixed-origin synthetic scenario contract.");}
     /// <summary>Retries at most once only when a stable mint/close identity makes a transport retry idempotent.</summary>
     async Task<T> ControlAsync<T>(string path,object? body,string? parentKey,string? runKey,CancellationToken cancellationToken)
     {

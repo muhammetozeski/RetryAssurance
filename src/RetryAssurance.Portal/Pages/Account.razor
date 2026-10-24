@@ -30,15 +30,15 @@ else
 @code{
 [SupplyParameterFromQuery(Name="next")]public string? Next{get;set;}
 string Alias="",RecoveryInput="",NewRecoveryKey="",DeleteConfirmation="",InviteToken="";bool ShowRecovery;
-string ContinuePath{get{if(Next is "/projects" or "/projects/new" or "/runner" or "/account/billing")return Next;foreach(var prefix in new[]{"/projects/","/runs/"})if(Next?.StartsWith(prefix,StringComparison.Ordinal)==true&&Guid.TryParseExact(Next[prefix.Length..],"D",out _))return Next;return "/projects";}}
+string ContinuePath{get{if(Next is "/projects" or "/projects/new" or "/runner" or "/account/billing")return Next.TrimStart('/');foreach(var prefix in new[]{"/projects/","/runs/"})if(Next?.StartsWith(prefix,StringComparison.Ordinal)==true&&Guid.TryParseExact(Next[prefix.Length..],"D",out _))return Next.TrimStart('/');return "projects";}}
 protected override async Task OnInitializedAsync(){var fragment=Navigation.ToAbsoluteUri(Navigation.Uri).Fragment;if(fragment.StartsWith("#invite=",StringComparison.Ordinal))InviteToken=Uri.UnescapeDataString(fragment[8..]);await RefreshAccount();}
 Task RefreshAccount()=>Act(async()=>await Session.RefreshAsync());
 Task Create()=>Act(async()=>{var response=await Api.PostAsync<AccountReply>("accounts",new{alias=Alias});if(response.Account is null||string.IsNullOrEmpty(response.RecoveryKey))throw new InvalidOperationException("The account response was incomplete.");Session.Accept(response.Account);NewRecoveryKey=response.RecoveryKey;Done("");});
 Task Recover()=>Act(async()=>{var response=await Api.PostAsync<AccountReply>("sessions",new{recoveryKey=RecoveryInput});Session.Accept(response.Account);RecoveryInput="";Done("");});
 Task Logout()=>Act(async()=>{await Api.PostAsync<Acknowledgement>("sessions/logout",new{});Session.Accept(null);ClearRecovery();Done("Signed out.");});
-Task DownloadRecovery()=>Act(async()=>{await Download("retry-assurance-private-recovery.txt","Retry Assurance private recovery credential\nService: "+new Uri(Navigation.BaseUri).GetLeftPart(UriPartial.Authority)+"\nAccount: "+Session.Account?.Id+"\nRecovery key: "+NewRecoveryKey+"\nAnyone holding this file can access the account. Store privately.","text/plain;charset=utf-8");Done("Recovery file downloaded. Keep it private.");});
+Task DownloadRecovery()=>Act(async()=>{await Download("retry-assurance-private-recovery.txt","Retry Assurance private recovery credential\nService: "+new Uri(Navigation.BaseUri).AbsoluteUri+"\nAccount: "+Session.Account?.Id+"\nRecovery key: "+NewRecoveryKey+"\nAnyone holding this file can access the account. Store privately.","text/plain;charset=utf-8");Done("Recovery file downloaded. Keep it private.");});
 void ClearRecovery(){NewRecoveryKey="";ShowRecovery=false;}
 void ContinueAfterSave(){ClearRecovery();if(InviteToken.Length==0)Navigation.NavigateTo(ContinuePath);}
-Task JoinInvite()=>Act(async()=>{var response=await Api.PostAsync<JoinedInvitation>("invites/join",new{token=InviteToken});InviteToken="";Navigation.NavigateTo("/projects/"+response.ProjectId,replace:true);});
+Task JoinInvite()=>Act(async()=>{var response=await Api.PostAsync<JoinedInvitation>("invites/join",new{token=InviteToken});InviteToken="";Navigation.NavigateTo("projects/"+response.ProjectId,replace:true);});
 Task DeleteAccount()=>Act(async()=>{await Api.PostAsync<Acknowledgement>("account/delete",new{confirmation=DeleteConfirmation});Session.Accept(null);DeleteConfirmation="";ClearRecovery();Done("Account and owned data deleted.");});
 }

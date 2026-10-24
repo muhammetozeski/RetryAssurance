@@ -2,14 +2,14 @@
 @inherits ActionPage
 @inject PortalApi Api
 @inject AccountSession Session
-<PageTitle>Projects — Retry Assurance</PageTitle><div class="title-row"><h1>Projects</h1>@if(Session.Account is not null){<a class="button primary" href="/projects/new">New project</a>}</div><StatusMessage Text="@Message" Error="@Failed" />
+<PageTitle>Projects — Retry Assurance</PageTitle><div class="title-row"><h1>Projects</h1>@if(Session.Account is not null){<a class="button primary" href="projects/new">New project</a>}</div><StatusMessage Text="@Message" Error="@Failed" />
 @if(!Loaded){@if(Busy){<p>Loading projects.</p>}else{<button @onclick="Load">Try again</button>}}
-else if(Session.Account is null){<p>Sign in to see your projects.</p><a class="button primary" href="/account?next=%2Fprojects">Create or recover account</a>}
+else if(Session.Account is null){<p>Sign in to see your projects.</p><a class="button primary" href="account?next=%2Fprojects">Create or recover account</a>}
 else
 {
 <button disabled="@Busy" @onclick="Load">Refresh</button>
-@if(Items.Count==0){<section class="empty-state"><h2>No projects yet.</h2><a class="button primary" href="/projects/new">Set up your first check</a></section>}
-<div class="project-list">@foreach(var item in Items){<a class="project-link" href="@("/projects/"+item.Id)"><div><h2>@item.Name</h2><p class="quiet">@item.Role · check version @item.ContractRevision</p></div><span>Open →</span></a>}</div>
+@if(Items.Count==0){<section class="empty-state"><h2>No projects yet.</h2><a class="button primary" href="projects/new">Set up your first check</a></section>}
+<div class="project-list">@foreach(var item in Items){<a class="project-link" href="@("projects/"+item.Id)"><div><h2>@item.Name</h2><p class="quiet">@item.Role · check version @item.ContractRevision</p></div><span>Open →</span></a>}</div>
 <details><summary>Free allowance and access</summary><p>Two owned projects and fifty checks per UTC calendar month. Owners manage settings and access; editors run checks; viewers read results.</p></details>
 }
 @code{
