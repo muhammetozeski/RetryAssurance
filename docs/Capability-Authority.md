@@ -1,0 +1,7 @@
+# Capability authority across a paused request
+
+An independent source review found that reading a project role before awaiting a streaming request body was insufficient for capability creation. A removed editor could finish an already-authorized body after the owner revoked existing capabilities, creating a new token unless insertion checked the current role again.
+
+Capability insertion now includes an atomic `EXISTS` condition on the creator's current owner/editor membership. Parent and child capability reads also require that membership. Run creation, effect admission and close admission include it in the write SQL, so a pre-read before a paused body cannot admit work after authority is removed. Removing or downgrading a member revokes their existing project capabilities, and the current-role condition remains a separate defense against stale requests.
+
+`verification/service.spec.mjs` uses the actual route, actual SQL and SQLite. It streams an opening JSON brace to the real request reader, waits until the consumer drains it, removes/downgrades the editor through the actual API, then releases the remaining body. The checks passed for capability insertion, run mint and effect commit: no new active token, no minted child run and zero durable effects respectively. Existing child evidence becomes unavailable after role loss. The complete harness passed 44 assertions. This is deterministic local request/SQL verification; it does not claim the corrected streaming interleaving has been exercised over production HTTPS.
